@@ -1,6 +1,7 @@
 # Statistical Arbitrage on Cryptocurrencies
 
 ## To get historical price data from Binance in the crypto_pairs_scratch.ipynb file:
+
 - Make an account on binance.us
 - Once your account is set up, follow [these steps](https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072) to create your api keys
     - In particular, make sure that you've enabled 2FA, you've made a deposit in your account, and that your account is verified
