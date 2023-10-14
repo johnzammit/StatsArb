@@ -5,6 +5,7 @@
 
 [//]: # (- `pip install -r requirements.txt`)
 - `pip install python-binance`
+- `pip install python-dotenv`
 
 ### Related API documentation:
 - https://docs.binance.us/
