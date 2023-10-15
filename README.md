@@ -31,5 +31,8 @@
 ### Testing your algorithm
 - Enable testnet: https://www.binance.com/en/support/faq/how-to-test-my-functions-on-binance-testnet-ab78f9a1b8824cf0a106b4229c76496d
 - Generate your testnet API keys and follow steps as above
+- Set your .env file to have:
+  - binanceAPIKey_testnet=YourAPIKeyThatYouCopiedFromBinance
+  - binanceSecretKey_testnet=YourSecretKeyThatYouCopiedFromBinance
 - Don't specify any `tld` in your Client initialization call
   - For production, you may specify `tld=us` if you are running the program from the US IP address
