@@ -7,6 +7,8 @@
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 import json
 import datetime
+import math
+
 
 class MarketState:
     """ Data class that holds all the information of the market about a pair needed for our algo """
@@ -22,6 +24,9 @@ class MarketState:
     
     def current_price(self, coin: str) -> float:
         # call binance.get_recent_trades
+        pass
+    def derivative_of_spread() -> float:
+        # return the derivative of the spread price (slope of the spread)
         pass
 
     def current_spread(self, coin1, coin2) -> float:
@@ -47,25 +52,33 @@ class Execution():
         # need to take in a formula
         pass
     
-    def place_order_condition(self, spread: float, upper_bollinger_band_price: float, lower_bollinger_band_price: float,  higher_coin: str, lower_coin: str) -> bool:
+    #checks if the spread is above the upper bollinger band or below the lower bollinger band
+    async def place_order_condition(self, spread: float, upper_bollinger_band_price: float, lower_bollinger_band_price: float,  higher_coin: str, lower_coin: str) -> bool:
         return spread >= upper_bollinger_band_price or spread <= lower_bollinger_band_price 
 
-    def sell_order_postition():
+    async def sell_order_postition():
         pass
     #tell binance to buy at a certain price
-    def place_limit_buy(self, coin, price):
+    async def place_limit_buy(self, coin, price):
         pass
     
-    #tell binance to se;; at a certain price
-    def place_limit_sell(self, coin, price):
+    #tell binance to sell at a certain price
+    async def place_limit_sell(self, coin, price):
         pass
 
+    #cancel unfilled limit sell orders and place new ones at updated price
+    async def update_limit_sell(lower_coin, take_profit_price):
+        pass
     #check if orders are still open or not before placing new orders
-    def check_order_status(self):
+    async def check_order_status(self):
         pass
+    #calculate time weighted take profit price
+    async def take_profit_price(self, coin: float) -> float:
+        decrease_rate = 0.055
+        target_price = MarketState.spread_moving_avg() - (decrease_rate * t) + MarketState.derivative_of_spread() % MarketState.current_price(coin) / 100
+        ## Need to add accelerator with the derivative of spread
 
-    def take_profit_price(self, coin: float) -> float:
-        return (mean_spread - (time * derivative_price)/sqrt(derivative_price))
+        return target_price
     
 
 
@@ -81,16 +94,23 @@ class Execution():
                 #update take profit price
                 take_profit_price()
 
-                #place limit sell order at take profit price
-                place_limit_sell(lower_coin, take_profit_price)
-                place_limit_sell(higher_coin, take_profit_price)
+                #place/update limit sell order at take profit price
+                if (no limit sell orders open):
+                    place_limit_sell(lower_coin, take_profit_price)
+                    place_limit_sell(higher_coin, take_profit_price)
+                else:
+                    update_limit_sell(lower_coin, take_profit_price)
+                    update_limit_sell(higher_coin, take_profit_price)
 
                 #check if orders are still open
                 if check_order_status():
                     continue
                 else:
                     break
-
+            #sell at hard stop loss
+            place_limit_sell(lower_coin, price)
+            place_limit_sell(higher_coin, price)
+                
 
 
 
