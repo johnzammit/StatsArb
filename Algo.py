@@ -32,7 +32,7 @@ class MarketState:
 
     def current_spread(self, coin1, coin2) -> float:
         return float(self.current_price(coin1)) - float(self.current_price(coin2))
-        pass
+        
 
     def spread_moving_avg(self, coin1, coin2) -> float:
         pass
@@ -189,13 +189,15 @@ class Execution():
             # monitor when to sell
             while (self.check_open_orders()):
                 #check if price is at or below hard stop loss
-                if ():
+                if (price is at or below hard stop loss):
                     #sell at hard stop loss
                     self.place_limit_buy(long_coin, price, quantity, stopPrice)
                     self.place_limit_sell(symbol, price, quantity, stopPrice)
                 #update take profit price
                 self.take_profit_long_price(long_coin, timestamp)
                 self.take_profit_short_price(short_coin, timestamp)
+
+                #consider adding a time delay here
 
                 #update limit sell order at take profit price
                 self.update_limit_sell(long_coin, take_profit_price)
@@ -206,9 +208,7 @@ class Execution():
                     continue
                 else:
                     break
-            #sell at hard stop loss
-            place_limit_buy(long_coin, price, quantity, stopPrice)
-            place_limit_sell(symbol, price, quantity, stopPrice)
+            
                 
         
 
