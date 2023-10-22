@@ -77,8 +77,8 @@ class MarketState:
         pass
 
     def current_spread(self, coin1, coin2) -> float:
-        return float(self.current_price(coin1)) - float(self.current_price(coin2))
-        pass
+        # TODO: do we want to qty of coin1 and coin2 as an arg (based on the lin-alg formula)? do we allow fractional qty?
+        return self.current_price(coin1) - self.current_price(coin2)
 
     def spread_moving_avg(self, coin1, coin2) -> float:
         # Get Rolling Window Price Change Statistics
