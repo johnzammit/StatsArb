@@ -10,7 +10,6 @@ import datetime
 import math
 from market_state import MarketState
 
-
 """
 Execution will using MarketState data to know when to execute a trade.
 """
@@ -23,6 +22,7 @@ import time
 
 
 class Execution():
+    # TODO: read up on Binance symbol and exchange filterrs -  https://binance-docs.github.io/apidocs/spot/en/#filters
     def __init__(self, formula, api_key, secret_key, api_url):
         """"Formula is a tuple containing coins and their weights (ticker, weight)"""
         # need to take in a formula

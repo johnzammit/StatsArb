@@ -1,4 +1,4 @@
-# Statistical Arbitrage on Cryptocurrencies
+# [Statistical Arbitrage on Cryptocurrencies](https://github.com/johnzammit/StatsArb)
 
 
 ### Dependencies:
@@ -9,7 +9,7 @@
 
 ### Related API documentation:
 - https://docs.binance.us/
-- https://binance-docs.github.io/
+- https://binance-docs.github.io/apidocs/spot/en/
 - https://github.com/sammchardy/python-binance
 - https://python-binance.readthedocs.io/en/latest/
 - https://www.binance.com/en/support/faq/how-to-test-my-functions-on-binance-testnet-ab78f9a1b8824cf0a106b4229c76496d
