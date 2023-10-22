@@ -7,7 +7,35 @@ from dataclasses import dataclass
 #     pass
 #
 
+@dataclass
+class SymbolInfo:
+    # https://binance-docs.github.io/apidocs/spot/en/#exchange-information
+    symbol: str
+    status: str
+    baseAsset: str
+    baseAssetPrecision: int
+    quoteAsset: str
+    quotePrecision: int
+    quoteAssetPrecision: int
+    orderTypes: list[str]
+    icebergAllowed: bool
+    ocoAllowed: bool
+    quoteOrderQtyMarketAllowed: bool
+    allowTrailingStop: bool
+    cancelReplaceAllowed: bool
+    isSpotTradingAllowed: bool
+    isMarginTradingAllowed: bool
+    filters: list # need to add filter object
+    permissions: list[str]
+    defaultSelfTradePreventionMode: str
+    allowedSelfTradePreventionModes: list[str]
 
+
+
+@dataclass
+class Ticker:
+    symbol: str
+    price: str
 @dataclass
 class OrderDepth:
     # https://docs.binance.us/#get-order-book-depth
@@ -89,11 +117,12 @@ class Order:
     workingTime: int
     selfTradePreventionMode: str
 
-@dataclass
+
 class Balance:
-    asset: str
-    free: str
-    locked: str
+    def __init__(self, asset: str, free: str, locked: str):
+        self.asset = asset
+        self.free = float(free)
+        self.locked = float(locked)
 
 # this class should hold everything
 class TradingState(object):

@@ -5,31 +5,69 @@ import math
 from algo.datamodel import *
 
 
-# TODO: this class is an instance of the market at time t
-
-# TODO: make the MarketState class call the client only once to get the info it needs
 class MarketState:
     """ Data class that holds all the information of the market about a pair needed for our algo """
 
-    def __init__(self, window_size: int, client: Client):
+    def __init__(self, client: Client = None, window_size: int = 1000):
+        assert (client != None)
         self.client = client
-        self.window_size = window_size
+        self.window_size = window_size  # TODO: define smallest time unit
+        self.ticker_prices = {}  # key: symbol (str), value: price (float)
+        self.time = None  # TODO: implement
 
-    # total USD value of all coins in exchange that we are holding
+        self.__fetch_prices()
+        self.symbols = list(self.ticker_prices.keys())
+
+    """
+    Updates the MarketState by fetching the latest data from the exchange.
+    This function should be called on every tick (as defined by the algorithm).
+    Other functions in this class will rely on the internal states that this function updates,
+    so this function should be called before any other functions in each time instance.
+    """
+
+    def update(self):
+        self.__fetch_prices()
+
+    """Private function that updates the prices within the MarketState class"""
+
+    def __fetch_prices(self):
+        # TODO: update time
+        for t in self.client.get_all_tickers():
+            symbol, price = t["symbol"], float(t["price"])
+            self.ticker_prices[symbol] = price
+
+    """Get the current price of a specific coin"""
+
+    def current_price(self, coin: str) -> float:
+        return self.ticker_prices[coin]
+
+    """Total USD value of all coins in exchange that we are holding"""
+
     def portfolio_balance(self) -> float:
         # need to all get_asset_balance and multiply by market price of the coin-USDT pair
-        balances = self.client.get_account()
-        ticker_prices = self.client.get_all_tickers()
-
+        # TODO: update balance inside the update function? or separately?
+        balances = [Balance(**b) for b in self.client.get_account()["balances"]]
         total_balance = 0
+        excluded_coins = []
         for b in balances:
-            asset_balance = Balance(**b)
-            ticker_usdt = asset_balance.asset + 'USDT'
-            # remark: assume all pairs have a USDT conversion
-            assert (ticker_usdt in ticker_prices)
+            if b.asset in ("USDT", "BUSD"):
+                # stablecoin values reflect real value of USD
+                total_balance += b.free + b.locked
+            else:
+                # need to convert this cryptocurrency to USDT to get price in USD
+                ticker_usdt = b.asset + 'USDT'  # remark: assume all pairs have a USDT conversion
 
-            qty = float(asset_balance.free) + float(asset_balance.locked)
-            total_balance += qty * ticker_prices[ticker_usdt]
+                if not (ticker_usdt in self.ticker_prices):
+                    # coins excluded from portfolio balance (no direct conversion to USD available)
+                    # TODO: find a conversion from these coins to BTC to USDT (maybe try BUSD)
+                    excluded_coins.append(b.asset)
+                    continue
+
+                qty = b.free + b.locked
+                total_balance += qty * self.ticker_prices[ticker_usdt]
+
+        print(
+            f"Excluded the following coins from portfolio balance calulations (could not find conversion to USD): {excluded_coins}")
 
         return total_balance
 
@@ -37,10 +75,6 @@ class MarketState:
         # this will move up/down as we our portfolio increases/decreases in value,
         #   do we want to set an absolute cutoff to limit exposure or are we fine with increased exposure we our portfolio grows?
         return 0.005 * self.portfolio_balance()
-
-    def current_price(self, coin: str) -> float:
-        # TODO: do we want last traded price, best bid price, best ask price, avg of bid-ask spread, avg_price, or what?
-        pass
 
     def derivative_of_spread(self) -> float:
         # return the derivative of the spread price (slope of the spread)
