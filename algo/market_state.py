@@ -18,32 +18,28 @@ class MarketState:
         self.__fetch_prices()
         self.symbols = list(self.ticker_prices.keys())
 
-    """
-    Updates the MarketState by fetching the latest data from the exchange.
-    This function should be called on every tick (as defined by the algorithm).
-    Other functions in this class will rely on the internal states that this function updates,
-    so this function should be called before any other functions in each time instance.
-    """
-
     def update(self):
+        """
+        Updates the MarketState by fetching the latest data from the exchange.
+        This function should be called on every tick (as defined by the algorithm).
+        Other functions in this class will rely on the internal states that this function updates,
+        so this function should be called before any other functions in each time instance.
+        """
         self.__fetch_prices()
 
-    """Private function that updates the prices within the MarketState class"""
-
     def __fetch_prices(self):
+        """Private function that updates the prices within the MarketState class"""
         # TODO: update time
         for t in self.client.get_all_tickers():
             symbol, price = t["symbol"], float(t["price"])
             self.ticker_prices[symbol] = price
 
-    """Get the current price of a specific coin"""
-
     def current_price(self, coin: str) -> float:
+        """Get the current price of a specific coin"""
         return self.ticker_prices[coin]
 
-    """Total USD value of all coins in exchange that we are holding"""
-
     def portfolio_balance(self) -> float:
+        """Total USD value of all coins in exchange that we are holding"""
         # need to all get_asset_balance and multiply by market price of the coin-USDT pair
         # TODO: update balance inside the update function? or separately?
         balances = [Balance(**b) for b in self.client.get_account()["balances"]]
