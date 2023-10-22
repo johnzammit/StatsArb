@@ -85,7 +85,7 @@ class Execution():
     
 
     #checks if the spread is above the upper bollinger band or below the lower bollinger band
-    async def place_order_condition(self, spread: float, upper_bollinger_band_price: float, lower_bollinger_band_price: float,  higher_coin: str, lower_coin: str) -> bool:
+    async def place_order_condition(self, spread: float, upper_bollinger_band_price: float, lower_bollinger_band_price: float) -> bool:
         return spread >= upper_bollinger_band_price or spread <= lower_bollinger_band_price 
 
     #tell binance to buy at a certain price
@@ -114,6 +114,7 @@ class Execution():
             "type": "LIMIT",
             "price": price,
             "quantity": quantity,
+            "stopPrice": stopPrice, #price at which limit order is triggered
             "timeinforce": "GTC", #good till cancelled
             "timestamp": int(round(time.time() * 1000))
         }
@@ -123,11 +124,11 @@ class Execution():
 
 
     #cancel unfilled limit sell orders and place new ones at updated price
-    async def update_limit_sell(self, lower_coin, take_profit_price, cancelReplaceMode, cancelOrderId, timeInForce, quantity, price):
+    async def update_limit_sell(self, short_coin, take_profit_price, cancelReplaceMode, cancelOrderId, timeInForce, quantity: float, price: float):
         uri_path = "/api/v3/order/cancelReplace"
         data =  {
             "timestamp": int(round(time.time() * 1000)),
-            "symbol":lower_coin,
+            "symbol":short_coin,
             "side": "SELL",
             "type": "LIMIT",
             "cancelReplaceMode":cancelReplaceMode,
@@ -142,14 +143,32 @@ class Execution():
 
 
     #check if orders are still open or not before placing new orders
-    async def check_order_status(self) -> bool:
-        pass
+    async def check_open_orders(self) -> bool:
+        uri_path = "/api/v3/openOrders"
+        data = {
+            "timestamp": int(round(time.time() * 1000))
+        }
+        result = self.binanceus_request(uri_path, data, self.api_key, self.secret_key)
+        response_data = result.json()
+        # Check if there are open orders
+        if len(response_data) > 0:
+            return True
+        else:
+            return False
+        
 
 
-    #calculate time weighted take profit price
-    async def take_profit_price(self, coin: float) -> float:
+    #calculate time weighted take profit price for long position
+    async def take_profit_long_price(self, coin: float, timestamp) -> float:
         decrease_rate = 0.055
-        target_price = MarketState.spread_moving_avg() - (decrease_rate * t) + MarketState.derivative_of_spread() % MarketState.current_price(coin) / 100
+        target_price = MarketState.spread_moving_avg() - (decrease_rate * timestamp) + MarketState.derivative_of_spread() % MarketState.current_price(coin) / 100
+        ## Need to add accelerator with the derivative of spread
+
+        return target_price
+    #calculate time weighted take profit price for short position
+    async def take_profit_short_price(self, coin: float, timestamp) -> float:
+        decrease_rate = 0.055
+        target_price = MarketState.spread_moving_avg() + (decrease_rate * timestamp) + MarketState.derivative_of_spread() % MarketState.current_price(coin) / 100
         ## Need to add accelerator with the derivative of spread
 
         return target_price
@@ -157,35 +176,41 @@ class Execution():
 
 
     def main(self, market: MarketState):
-        # check if we should buy or sell
-        if (place_order_condition()):
-            place_limit_buy(higher_coin, price)
-            place_limit_sell(lower_coin, price)
-            #start timer
-            time = 0
-            # monitor when to sell
-            while (value of all positions > hard_stop_loss()):
-                #update take profit price
-                take_profit_price()
 
-                #place/update limit sell order at take profit price
-                if (no limit sell orders open):
-                    place_limit_sell(lower_coin, take_profit_price)
-                    place_limit_sell(higher_coin, take_profit_price)
-                else:
-                    update_limit_sell(lower_coin, take_profit_price)
-                    update_limit_sell(higher_coin, take_profit_price)
+    
+        # check if we should buy or sell
+        if (self.place_order_condition(spread, upper_bollinger_band_price, lower_bollinger_band_price)):
+            self.place_limit_buy(long_coin, price, quantity, stopPrice)
+            self.place_limit_sell(symbol, price, quantity, stopPrice)
+
+            #start timer
+            timestamp = int(time.time() * 1000)
+
+            # monitor when to sell
+            while (self.check_open_orders()):
+                #check if price is at or below hard stop loss
+                if ():
+                    #sell at hard stop loss
+                    self.place_limit_buy(long_coin, price, quantity, stopPrice)
+                    self.place_limit_sell(symbol, price, quantity, stopPrice)
+                #update take profit price
+                self.take_profit_long_price(long_coin, timestamp)
+                self.take_profit_short_price(short_coin, timestamp)
+
+                #update limit sell order at take profit price
+                self.update_limit_sell(long_coin, take_profit_price)
+                self.update_limit_sell(short_coin, take_profit_price)
 
                 #check if orders are still open
-                if check_order_status():
+                if self.check_open_orders():
                     continue
                 else:
                     break
             #sell at hard stop loss
-            place_limit_sell(lower_coin, price)
-            place_limit_sell(higher_coin, price)
+            place_limit_buy(long_coin, price, quantity, stopPrice)
+            place_limit_sell(symbol, price, quantity, stopPrice)
                 
-
+        
 
 
           
