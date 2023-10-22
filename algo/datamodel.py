@@ -1,7 +1,6 @@
 from typing import Dict, List
 from dataclasses import dataclass
 
-
 # NOTE: we create dataclasses with class variable names that match the JSON objects that Binance API returns
 # TODO: convert float to some a higher precision type since crypto uses a lot of decimal points
 # class Listing:
@@ -10,13 +9,16 @@ from dataclasses import dataclass
 
 """Classes related to Account"""
 
+
 class Balance:
     def __init__(self, asset: str, free: str, locked: str):
         self.asset = asset
         self.free = float(free)
         self.locked = float(locked)
 
+
 """Classes related to Exchange"""
+
 
 @dataclass
 class SymbolInfo:
@@ -43,6 +45,8 @@ class SymbolInfo:
 
 
 """Classes related to Market"""
+
+
 @dataclass
 class Ticker:
     symbol: str
@@ -113,19 +117,41 @@ class Kline:
     https://docs.binance.us/#get-candlestick-data
     Kline/candlestick bars for a symbol.
     Klines are uniquely identified by their open time.
+
+
+
     """
-    openTime: int # kline open time
+    openTime: int  # kline open time
     open: str  # opening price
     high: str  # highest traded price
     low: str  # lowest traded price
     close: str  # closing price
-    volume: str # volume
-    closeTime: int # kline close time
+    volume: str  # volume
+    closeTime: int  # kline close time
     quoteAssetVol: str  # quote asset volume
-    numTrades: int # numbe rof trades
+    numTrades: int  # number of trades
     takerBuyBaseAssetVol: str  # take buyer base asset volume
     takerBuyQuoteAssetVol: str  # take buy quote asset volume
-    __ignore__: str # unused field, ignore
+    __ignore: str  # unused field, ignore
+
+    # def __init__(self, openTime: int, open: str, high: str, low: str, close: str, volume: str, closeTime: int,
+    #              quoteAssetVol: str, numTrades: int, takerBuyBaseAssetVol: str, takerBuyQuoteAssetVol: str,
+    #              __ignore: str):
+    #     self.openTime = openTime
+    #     self.open = float(open)
+    #     self.high = float(high)
+    #     self.low = float(low)
+    #     self.close = float(close)
+    #     self.volume = float(volume)
+    #     self.closeTime = closeTime
+    #     self.quoteAssetVolume = float(quoteAssetVol)
+    #     self.numTrades = numTrades
+    #     self.takerBuyBaseAssetVol = float(takerBuyBaseAssetVol)
+    #     self.takerBuyQuoteAssetVol = float(takerBuyQuoteAssetVol)
+
+    def __lt__(self, other) -> bool:
+        """Check if current kline's openTime is less than the other kline's openTime (needed for sorting)."""
+        return self.openTime < other.openTime
 
 
 @dataclass
@@ -175,3 +201,14 @@ class OrderbookTicker:
     askQty: str
 
 
+@dataclass(frozen=True)
+class PairPortfolio:
+    """
+    Mean-reverting portfolio consisting of a pair of coins
+    The spread is defined as: spread = coin1 - coin2 * beta.
+    Beta should be a constant that makes spread's mean = 0.
+    Try to use the higher-priced coin as coin1, so that beta > 1
+    """
+    coin1: str  # coin1 (assume qty = 1)
+    coin2: str  # coin2 (assume qty = -beta)
+    beta: float  # constant that balances of the total value of coin1 and coin2
