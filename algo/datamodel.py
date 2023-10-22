@@ -212,3 +212,8 @@ class PairPortfolio:
     coin1: str  # coin1 (assume qty = 1)
     coin2: str  # coin2 (assume qty = -beta)
     beta: float  # constant that balances of the total value of coin1 and coin2
+
+@dataclass
+class BollingerBand:
+    mean: float
+    stdev: float
