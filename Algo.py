@@ -10,6 +10,7 @@ import datetime
 import math
 
 
+
 class MarketState:
     """ Data class that holds all the information of the market about a pair needed for our algo """
     def __init__(self, windowSize: int):
@@ -46,32 +47,105 @@ class MarketState:
 """
 Execution will using MarketState data to know when to execute a trade.
 """
+import urllib.parse
+import hashlib
+import hmac
+import base64
+import requests
+import time
+
 class Execution():
-    def __init__(self, formula):
+    def __init__(self, formula, api_key, secret_key, api_url):
         """"Formula is a tuple containing coins and their weights (ticker, weight)"""
         # need to take in a formula
-        pass
+        self.api_url = "https://api.binance.us"
+        self.api_key = "YOUR_API_KEY"
+        self.secret_key = "YOUR_SECRET_KEY"
+
+    # get binanceus signature
+    def get_binanceus_signature(self, data, secret):
+        postdata = urllib.parse.urlencode(data)
+        message = postdata.encode()
+        byte_key = bytes(secret, 'UTF-8')
+        mac = hmac.new(byte_key, message, hashlib.sha256).hexdigest()
+        return mac
     
+
+    # Attaches auth headers and returns results of a POST request
+    def binanceus_request(self, uri_path, data, api_key, api_sec):
+        headers = {}
+        headers['X-MBX-APIKEY'] = api_key
+        signature = self.get_binanceus_signature(data, api_sec)
+        payload={
+            **data,
+            "signature": signature,
+            }
+        req = requests.post((self.api_url + uri_path),headers=headers,data=payload)
+        return req.text
+    
+
     #checks if the spread is above the upper bollinger band or below the lower bollinger band
     async def place_order_condition(self, spread: float, upper_bollinger_band_price: float, lower_bollinger_band_price: float,  higher_coin: str, lower_coin: str) -> bool:
         return spread >= upper_bollinger_band_price or spread <= lower_bollinger_band_price 
 
-    async def sell_order_postition():
-        pass
     #tell binance to buy at a certain price
-    async def place_limit_buy(self, coin, price):
-        pass
+    async def place_limit_buy(self, symbol: str, price: float, quantity: float, stopPrice: float): 
+        uri_path = "/api/v3/order"
+        data = {
+            "symbol": symbol,
+            "side": "BUY",
+            "type": "LIMIT",
+            "price": price,
+            "quantity": quantity,
+            "timeinforce": "GTC", #good till cancelled
+            "timestamp": int(round(time.time() * 1000))
+        }
+
+        result = self.binanceus_request(uri_path, data, self.api_key, self.secret_key)
+        print("POST {}: {}".format(uri_path, result))
     
+
     #tell binance to sell at a certain price
-    async def place_limit_sell(self, coin, price):
-        pass
+    async def place_limit_sell(self, symbol: str, price: float, quantity: float, stopPrice: float):
+        uri_path = "/api/v3/order"
+        data = {
+            "symbol": symbol, #ex. BTCUSDT
+            "side": "SELL",
+            "type": "LIMIT",
+            "price": price,
+            "quantity": quantity,
+            "timeinforce": "GTC", #good till cancelled
+            "timestamp": int(round(time.time() * 1000))
+        }
+
+        result = self.binanceus_request(uri_path, data, self.api_key, self.secret_key)
+        print("POST {}: {}".format(uri_path, result))
+
 
     #cancel unfilled limit sell orders and place new ones at updated price
-    async def update_limit_sell(lower_coin, take_profit_price):
-        pass
+    async def update_limit_sell(self, lower_coin, take_profit_price, cancelReplaceMode, cancelOrderId, timeInForce, quantity, price):
+        uri_path = "/api/v3/order/cancelReplace"
+        data =  {
+            "timestamp": int(round(time.time() * 1000)),
+            "symbol":lower_coin,
+            "side": "SELL",
+            "type": "LIMIT",
+            "cancelReplaceMode":cancelReplaceMode,
+            "cancelOrderId":cancelOrderId,
+            "timeInForce":timeInForce,
+            "quantity":quantity,
+            "price":price
+        }
+
+        result = Execution.binanceus_request(uri_path, data, self.api_key, self.secret_key)
+        print("POST {}: {}".format(uri_path, result))
+
+
     #check if orders are still open or not before placing new orders
-    async def check_order_status(self):
+    async def check_order_status(self) -> bool:
         pass
+
+
     #calculate time weighted take profit price
     async def take_profit_price(self, coin: float) -> float:
         decrease_rate = 0.055
