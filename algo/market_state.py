@@ -74,9 +74,11 @@ class MarketState:
 
     def derivative_of_spread(self) -> float:
         # return the derivative of the spread price (slope of the spread)
+        # TODO: clarify formula: (change in price of spread) / (time or ??)
+        # TODO: internal timer, 1 second for now, but make it adjustable
         pass
 
-    def current_spread(self, coin1, coin2) -> float:
+    def current_spread(self, coin1: str, coin2: str) -> float:
         # TODO: do we want to qty of coin1 and coin2 as an arg (based on the lin-alg formula)? do we allow fractional qty?
         return self.current_price(coin1) - self.current_price(coin2)
 
