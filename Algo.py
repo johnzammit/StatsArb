@@ -176,7 +176,7 @@ class Execution():
 
 
     def main(self, market: MarketState):
-
+        #Define all variables using MarketState
     
         # check if we should buy or sell
         if (self.place_order_condition(spread, upper_bollinger_band_price, lower_bollinger_band_price)):
@@ -188,8 +188,11 @@ class Execution():
 
             # monitor when to sell
             while (self.check_open_orders()):
+                #update variables using MarketState
+
+
                 #check if price is at or below hard stop loss
-                if (price is at or below hard stop loss):
+                if (MarketState.current_price(long_coin) <= MarketState.hard_stop_loss(long_coin) or MarketState.current_price(short_coin) >= MarketState.hard_stop_loss(short_coin)):
                     #sell at hard stop loss
                     self.place_limit_buy(long_coin, price, quantity, stopPrice)
                     self.place_limit_sell(symbol, price, quantity, stopPrice)
@@ -209,12 +212,6 @@ class Execution():
                 else:
                     break
             
-                
-        
 
-
-          
-        pass
-
-if __name__ == '__main__':
-    main()
+    if __name__ == '__main__':
+        main()
