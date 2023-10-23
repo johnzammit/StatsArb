@@ -124,7 +124,7 @@ class Execution():
 
 
     #cancel unfilled limit sell orders and place new ones at updated price
-    async def update_limit_sell(self, short_coin, take_profit_price, cancelReplaceMode, cancelOrderId, timeInForce, quantity: float, price: float):
+    async def update_limit_sell(self, short_coin: str, cancelReplaceMode, cancelOrderId, timeInForce, quantity: float, price: float):
         uri_path = "/api/v3/order/cancelReplace"
         data =  {
             "timestamp": int(round(time.time() * 1000)),
@@ -155,7 +155,22 @@ class Execution():
             return True
         else:
             return False
-        
+    #calculate total value of all open positions
+    async def open_positions_value(self) -> float:
+        uri_path = "/api/v3/openOrders"
+        data = {
+            "timestamp": int(round(time.time() * 1000))
+        }
+        result = self.binanceus_request(uri_path, data, self.api_key, self.secret_key)
+        open_orders = json.loads(result)
+
+        total_position_value = 0.0
+        for order in open_orders:
+            price = float(order["price"])
+            origQty = float(order["origQty"])
+            position_value = price * origQty
+            total_position_value += position_value
+        return total_position_value
 
 
     #calculate time weighted take profit price for long position
@@ -177,11 +192,12 @@ class Execution():
 
     def main(self, market: MarketState):
         #Define all variables using MarketState
-    
+
         # check if we should buy or sell
         if (self.place_order_condition(spread, upper_bollinger_band_price, lower_bollinger_band_price)):
             self.place_limit_buy(long_coin, price, quantity, stopPrice)
             self.place_limit_sell(symbol, price, quantity, stopPrice)
+            original_position_value = self.open_positions_value()
 
             #start timer
             timestamp = int(time.time() * 1000)
@@ -192,13 +208,14 @@ class Execution():
 
 
                 #check if price is at or below hard stop loss
-                if (MarketState.current_price(long_coin) <= MarketState.hard_stop_loss(long_coin) or MarketState.current_price(short_coin) >= MarketState.hard_stop_loss(short_coin)):
+                if (MarketState.hard_stop_loss() * -1 >= self.open_positions_value() - original_position_value):
                     #sell at hard stop loss
                     self.place_limit_buy(long_coin, price, quantity, stopPrice)
                     self.place_limit_sell(symbol, price, quantity, stopPrice)
+
                 #update take profit price
-                self.take_profit_long_price(long_coin, timestamp)
-                self.take_profit_short_price(short_coin, timestamp)
+                long_take_profit= self.take_profit_long_price(long_coin, timestamp)
+                short_take_profit = self.take_profit_short_price(short_coin, timestamp)
 
                 #consider adding a time delay here
 
