@@ -217,3 +217,9 @@ class PairPortfolio:
 class BollingerBand:
     mean: float
     stdev: float
+
+@dataclass
+class PriceInterval:
+    estimate: float
+    lower: float
+    upper: float

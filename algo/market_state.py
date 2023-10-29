@@ -37,9 +37,8 @@ class MarketState:
 
         # TODO: handle window_size > 1000 (current window size limit on Binance API is 1000)
         self.window_size = window_size  # TODO: allow different window_size and time unit for different pairs?
-        self.portfolios = dict()  # list of all spread portfolios (coin1, coin2, beta) we are tracking
-        self.bollinger_bands = dict()
-        self.pairs = set()
+        self.portfolios = dict()  # key: (coin1, coin2), value: object with beta, prices, bollinger bands
+        self.bollinger_bands = dict() # key: (coin1, coin2)
 
     def update(self):
         """
@@ -114,8 +113,8 @@ class MarketState:
 
     def __calculate_initial_band(self, coin_pair: PairPortfolio):
         # TODO: optimize and handle potential overflow (checkout Numpy?), watchout for precision
-        window_mean = statistics.fmean(self.portfolios[(coin_pair.coin1, coin_pair.coin2)])
-        window_stdev = statistics.stdev(self.portfolios[(coin_pair.coin1, coin_pair.coin2)],
+        window_mean = statistics.fmean(self.portfolios[coin_pair])
+        window_stdev = statistics.stdev(self.portfolios[coin_pair],
                                         window_mean)  # sample standard deviation
         self.bollinger_bands = BollingerBand(mean=window_mean, stdev=window_stdev)
 
@@ -129,6 +128,28 @@ class MarketState:
 
     def __update_bollinger_bands(self):
         pass
+
+    def track_spread_portfolio(self, coin1_symbol: str, coin2_symbol: str) -> bool:
+        """Compute beta internally, tracking a spread portfolio for a pair of coins. Returns true if successful, false otherwise.
+        Formula: spread = coin1 - coin2 * beta
+
+        Example:
+            Suppose that beta = 7.4
+            Then let's say you want to buy this spread, and you want to do 10 shares of coin1
+            Then you buy 10 shares of coin1, and you short 74 shares of coin2
+
+        XXX: potential issue with fractional shares due to the exchange's price/qty filters (need to verify)
+        """
+        # TODO: change params to coin1, coin2, beta
+        if coin_pair not in self.portfolios:
+            self.__fill_window(coin_pair, self.window_size)  # use default window_size for now
+            self.__calculate_initial_band(coin_pair)
+            self.pairs.add((coin_pair.coin1, coin_pair.coin2))
+            return True
+        else:
+            # if coin_pair already exists? just refill the window? return true orr false?
+            # allow updating window size?
+            return False
 
     def track_spread_portfolio(self, coin_pair: PairPortfolio) -> bool:
         """Begin tracking a spread portfolio for a pair of coins. Returns true if successful, false otherwise.
@@ -213,7 +234,7 @@ class MarketState:
         # TODO: internal timer, 1 second for now, but make it adjustable
         pass
 
-    def current_spread(self, coin1: str, coin2: str, beta: float) -> float:
+    def current_spread(self, coin1: str, coin2: str) -> float:
         # TODO: use internal beta and remove beta as param
         return self.__calculate_spread(self.current_price(coin1), self.current_price(coin2), beta)
 
@@ -227,3 +248,7 @@ class MarketState:
 
     def spread_lower_bollinger_band(self, coin1, coin2) -> float:
         return self.bollinger_bands[(coin1, coin2)].mean - 2 * self.bollinger_bands[(coin1, coin2)].stdev
+
+# TODO: expand window of data after we have a position within a portfolio
+
+# TODO: define and handle which coin is coin1 or coin2 (order  matters?)

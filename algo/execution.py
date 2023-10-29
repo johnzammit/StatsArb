@@ -7,6 +7,7 @@
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 import json
 import datetime
+from datamodel import Ticker, BollingerBand, PriceInterval
 
 import math
 from market_state import MarketState
@@ -41,6 +42,7 @@ class Execution():
 
     # Attaches auth headers and returns results of a POST request
     def binanceus_request(self, uri_path, data, api_key, api_sec):
+        # TODO: probably could just use the order API in the binance-python library
         headers = {}
         headers['X-MBX-APIKEY'] = api_key
         signature = self.get_binanceus_signature(data, api_sec)
@@ -158,14 +160,17 @@ class Execution():
     
 
 
-    def main(self, market: MarketState):
+    def main(self, spread: PriceInterval, long_coin: Ticker, short_coin: Ticker, quantity: float, stopPrice: float):
+        # XXX: define quantity/fix params
+        # TODO: making the function take in parameters allow us to test more easily and separately from MarketState (so we can isolate which class has a problem)
+        # XXX: should return a result for each iteration of this (so we can debug/see what happened in each iteration during backtest)
+
         #Define all variables using MarketState
 
         # check if we should buy or sell
-        
-        if (self.place_order_condition(spread, upper_bollinger_band_price, lower_bollinger_band_price)):
-            self.place_limit_buy(long_coin, price, quantity, stopPrice)
-            self.place_limit_sell(symbol, price, quantity, stopPrice)
+        if (self.place_order_condition(spread.estimate, spread.upper, spread.lower)):
+            self.place_limit_buy(long_coin.symbol, long_coin.price, quantity, stopPrice)
+            self.place_limit_sell(short_coin.symbol, short_coin.price, quantity, stopPrice)
             original_position_value = self.open_positions_value()
 
             #start timer
@@ -179,8 +184,8 @@ class Execution():
                 #check if price is at or below hard stop loss
                 if (MarketState.hard_stop_loss() * -1 >= self.open_positions_value() - original_position_value):
                     #sell at hard stop loss
-                    self.place_limit_buy(long_coin, price, quantity, stopPrice)
-                    self.place_limit_sell(symbol, price, quantity, stopPrice)
+                    self.place_limit_buy(long_coin.symbol, long_coin.price, quantity, stopPrice)
+                    self.place_limit_sell(short_coin.symbol, short_coin.price, quantity, stopPrice)
 
                 #update take profit price
                 long_take_profit= self.take_profit_long_price(long_coin, timestamp)

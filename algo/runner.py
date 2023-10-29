@@ -15,3 +15,48 @@
 
 
 # probably go with idea 2
+
+from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
+from market_state import MarketState
+from execution import Execution
+from exchange_setup import establish_connection
+
+def main():
+    # TODO: add optional parameters for coins to trade on
+    pairs_to_trade = [("ETHBTC", "BNBBTC"), ("DOGEBTC", "BTCUSDT")] # change this
+    client = establish_connection()
+    print(client.get_exchange_info())
+
+    updates_to_coin_pairs = None # integration tester should update this variable somehow (use async or define API?)
+    state = MarketState(client)
+
+    for p in pairs_to_trade:
+        state.track_spread_portfolio(p)
+
+    executor = Execution(...)
+
+    while True:
+        # Listen for updates to coin list to trade
+        updates_to_coin_pairs = ... # check for updates from user or cointegration tester
+        if updates_to_coin_pairs is not None:
+             for p in updates_to_coin_pairs:
+                # start tracking or stop tracking pairs as specified
+                if p == ... :
+                    pairs_to_trade.append(p)
+                    state.track_spread_portfolio(p)
+                elif p == ...:
+                    pairs_to_trade.remove(p)
+                    state.untrack_spread_portfolio(p)
+                elif p == ...:
+                    state.update_beta(p)
+
+        state.update()
+
+        for p in pairs_to_trade:
+            portfolio_info = (state.current_price(), ..., ...)
+            action, result = executor.main(*portfolio_info)
+            print(f"Time: {state.current_time}; Pair: {..., ...}; Beta: {...}; Action: {action}; Result: {result}")
+
+
+if __name__ == '__main__':
+    main()
