@@ -23,7 +23,7 @@ from exchange_setup import establish_connection
 
 def main():
     # TODO: add optional parameters for coins to trade on
-    pairs_to_trade = [("ETHBTC", "BNBBTC", 7.588573028987537), ("DOGEBTC", "BTCUSDT", 5.0)] # change this
+    pairs_to_trade = [("ETHBTC", "BNBBTC"), ("DOGEBTC", "BTCUSDT")] # change this
     client = establish_connection()
     print(client.get_exchange_info())
 
