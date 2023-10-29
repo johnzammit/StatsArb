@@ -162,6 +162,7 @@ class Execution():
         #Define all variables using MarketState
 
         # check if we should buy or sell
+        
         if (self.place_order_condition(spread, upper_bollinger_band_price, lower_bollinger_band_price)):
             self.place_limit_buy(long_coin, price, quantity, stopPrice)
             self.place_limit_sell(symbol, price, quantity, stopPrice)
