@@ -36,13 +36,12 @@ class MarketState:
         self.__update_time()
 
         self.__fetch_prices()
-        self.symbols = list(self.ticker_prices.keys())
+        self.symbols = set(self.ticker_prices.keys())
 
         # TODO: handle window_size > 1000 (current window size limit on Binance API is 1000)
         self.window_size = window_size  # TODO: allow different window_size and time unit for different pairs?
-        # self.portfolios = dict()  # key: (coin1, coin2), value: object with beta, prices, bollinger bands
-        self.bollinger_bands = dict() # key: (coin1, coin2)
 
+        self.bollinger_bands = {} # key: (coin1, coin2)
         self.prices_dict = {} # key: coin string, val: deque of prices
         self.log_returns_dict = {} # key: coin string, val: deque of log returns
         self.betas_dict = {} # key: tuple(coin_1 string, coin_2 string), val: deque of betas
@@ -75,8 +74,8 @@ class MarketState:
                     self.prices_dict[symbol].popleft()
                     self.log_returns_dict[symbol].popleft()
 
-    def __calculate_spread(self, price1: float, price2: float, beta: float) -> float:
-        return price1 - price2 * beta
+    def __calculate_spread(self, coin_pair: tuple[str, str]) -> float:
+        return self.prices_dict[coin_pair[0]] - self.prices_dict[coin_pair[1]] * self.betas_dict[coin_pair]
 
     def __calculate_kline_price_avg(self, k: Kline):
         return (float(k.low) + float(k.high)) / 2
@@ -135,19 +134,13 @@ class MarketState:
         results = sm.OLS(log_returns_2, S1).fit()
         beta = results.params[1]
 
-        self.prices_dict = {
-            coin_pair[0]: deque(prices_1),
-            coin_pair[1]: deque(prices_2)
-        }
+        self.prices_dict[coin_pair[0]] = deque(prices_1)
+        self.prices_dict[coin_pair[1]] = deque(prices_2)
 
-        self.log_returns_dict = {
-            coin_pair[0]: deque(log_returns_1),
-            coin_pair[1]: deque(log_returns_2)
-        }
+        self.log_returns_dict[coin_pair[0]] = deque(log_returns_1)
+        self.log_returns_dict[coin_pair[1]] = deque(log_returns_2)
 
-        self.betas_dict = {
-            (coin_pair[0], coin_pair[1]): deque([beta])
-        }
+        self.betas_dict[coin_pair] = deque([beta])
 
     def __calculate_initial_band(self, coin_pair: PairPortfolio):
         # TODO: optimize and handle potential overflow (checkout Numpy?), watchout for precision
