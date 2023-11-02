@@ -7,6 +7,9 @@ from binance import Client
 
 from algo.datamodel import *
 
+import statsmodels.api as sm
+import numpy as np
+import math
 
 # TODO: import system time and figure out how to keep track of time based on different input time units
 # TODO: handle/prevent rate limits
@@ -37,8 +40,12 @@ class MarketState:
 
         # TODO: handle window_size > 1000 (current window size limit on Binance API is 1000)
         self.window_size = window_size  # TODO: allow different window_size and time unit for different pairs?
-        self.portfolios = dict()  # key: (coin1, coin2), value: object with beta, prices, bollinger bands
+        # self.portfolios = dict()  # key: (coin1, coin2), value: object with beta, prices, bollinger bands
         self.bollinger_bands = dict() # key: (coin1, coin2)
+
+        self.prices_dict = {} # key: coin string, val: deque of prices
+        self.log_returns_dict = {} # key: coin string, val: deque of log returns
+        self.betas_dict = {} # key: tuple(coin_1 string, coin_2 string), val: deque of betas
 
     def update(self):
         """
@@ -61,6 +68,12 @@ class MarketState:
         for t in self.client.get_all_tickers():
             symbol, price = t["symbol"], float(t["price"])
             self.ticker_prices[symbol] = price
+            if symbol in self.prices_dict:
+                self.prices_dict[symbol].append(price)
+                self.log_returns_dict[symbol].append(math.log(price) - self.log_returns_dict[symbol][-1])
+                if len(self.prices_dict[symbol] > self.window_size):
+                    self.prices_dict[symbol].popleft()
+                    self.log_returns_dict[symbol].popleft()
 
     def __calculate_spread(self, price1: float, price2: float, beta: float) -> float:
         return price1 - price2 * beta
@@ -82,10 +95,7 @@ class MarketState:
             kline = Kline(*k)
             yield function(kline)
 
-    def __calculate_beta(self, p1: float, p2: float):
-        return p1 / p2
-
-    def __fill_window(self, coin_pair: PairPortfolio, window_size: int):
+    def __fill_window(self, coin_pair: tuple[str, str], window_size: int):
         """
         Fill the window with historical data
 
@@ -101,15 +111,43 @@ class MarketState:
 
         # TODO: create function to calculate exact UTC startTime to get the desired window_size?
         # XXX: should we attach the price's time to the window?
-        self.portfolios[coin_pair] = deque([])
-        count = 0  # TODO: optimize this
-        for price1, price2 in zip(self.__kline_generator(coin_pair.coin1, self.kline_interval),
-                                  self.__kline_generator(coin_pair.coin2, self.kline_interval)):
-            self.portfolios[coin_pair].append(price1 - price2 * coin_pair.beta)
-            if count > window_size:
-                self.portfolios[coin_pair].popleft()
+        # self.portfolios[coin_pair] = deque([])
+        # count = 0  # TODO: optimize this    
+        # for price1, price2 in zip(self.__kline_generator(coin_pair.coin1, self.kline_interval),
+        #                           self.__kline_generator(coin_pair.coin2, self.kline_interval)):
+        #     self.portfolios[coin_pair].append(price1 - price2 * coin_pair.beta)
+        #     if count > window_size:
+        #         self.portfolios[coin_pair].popleft()
 
-        assert (len(self.portfolios[coin_pair]) > 0)
+        # assert (len(self.portfolios[coin_pair]) > 0)
+
+        # ------------------------------------------------------------------
+
+        # Should be using window_size to determine how much data to get
+        prices_1 = self.__kline_generator(coin_pair[0], self.kline_interval)
+        prices_2 = self.__kline_generator(coin_pair[1], self.kline_interval)
+
+        log_returns_1 = np.diff(np.log(np.array(prices_1)))
+        log_returns_2 = np.diff(np.log(np.array(prices_2)))
+
+        S1 = log_returns_1.copy()
+        S1 = sm.add_constant(S1)
+        results = sm.OLS(log_returns_2, S1).fit()
+        beta = results.params[1]
+
+        self.prices_dict = {
+            coin_pair[0]: deque(prices_1),
+            coin_pair[1]: deque(prices_2)
+        }
+
+        self.log_returns_dict = {
+            coin_pair[0]: deque(log_returns_1),
+            coin_pair[1]: deque(log_returns_2)
+        }
+
+        self.betas_dict = {
+            (coin_pair[0], coin_pair[1]): deque([beta])
+        }
 
     def __calculate_initial_band(self, coin_pair: PairPortfolio):
         # TODO: optimize and handle potential overflow (checkout Numpy?), watchout for precision
@@ -119,13 +157,22 @@ class MarketState:
         self.bollinger_bands = BollingerBand(mean=window_mean, stdev=window_stdev)
 
     def __update_all_windows(self):
-        """Update the window with the current period"""
+        # """Update the window with the current period"""
+        """This should be run after new prices are fetched for each coin.
+        We will redo the regression for each pair, and then append the new beta for each pair.
+        """
         # TODO: combine with Jimmy's OLS
         # TODO: clarify whether to update by calling Binance and getting a new window orr just update using latest price (potential synchronization issue)
-        for p in self.portfolios:
-            self.portfolios[p].popleft()
-            self.portfolios[p].append(self.current_spread(p.coin1, p.coin2, p.beta))
-
+        # for p in self.portfolios:
+        #     self.portfolios[p].popleft()
+        #     self.portfolios[p].append(self.current_spread(p.coin1, p.coin2, p.beta))
+        for pair in self.betas_dict.keys():
+            S1 = self.log_returns_dict[pair[0]].copy()
+            S1 = sm.add_constant(S1)
+            results = sm.OLS(self.log_returns_dict[pair[1]], S1).fit()
+            new_beta = results.params[1]
+            self.betas_dict[pair].append(new_beta)
+        
     def __update_bollinger_bands(self):
         pass
 
