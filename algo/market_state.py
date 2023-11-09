@@ -1,44 +1,48 @@
 import statistics
 import time
 from collections import deque
-from typing import Callable, Any
+from typing import Callable, Any, Deque
 
 from binance import Client
 
 from algo.datamodel import *
 
-
-# TODO: import system time and figure out how to keep track of time based on different input time units
-# TODO: handle/prevent rate limits
+import statsmodels.api as sm
+import numpy as np
+import math
 
 class MarketState:
     """ Data class that holds all the information of the market about a pair needed for our algo """
 
     def __init__(self, client: Client = None, window_size: int = 1000,
                  kline_interval: str = Client.KLINE_INTERVAL_1MINUTE):
-        assert (client != None and window_size > 0)
+        assert (client is not None and window_size > 0)
 
-        # TODO: track coins and allow updating beta
         self.client = client
 
-        self.ticker_prices = {}  # key: symbol (str), value: price (float)
+        self.ticker_prices = {}  # key: symbol (str), value: latest price (float)
 
-        # we use milliseconds to keep track of the internal clock as that is what Binance uses for its servertime
-        # self.time_unit =
-        # if time_unit == "seconds":
-        #     self.time_increment = 1000
-
+        # Binance uses milliseconds for the 'time' in the response
         self.kline_interval = kline_interval  # smallest kline time interval is 1 minute
-
         self.__update_time()
 
-        self.__fetch_prices()
-        self.symbols = list(self.ticker_prices.keys())
+        self.__fetch_prices() # get price of ALL tickers (may remove this if not needed)
+        self.symbols = set(self.ticker_prices.keys()) # list of all valid symbols
 
-        # TODO: handle window_size > 1000 (current window size limit on Binance API is 1000)
+        # TODO: handle window_size > 1000 (current window size limit per request on Binance API is 1000)
         self.window_size = window_size  # TODO: allow different window_size and time unit for different pairs?
-        self.portfolios = dict()  # key: (coin1, coin2), value: object with beta, prices, bollinger bands
-        self.bollinger_bands = dict() # key: (coin1, coin2)
+
+        self.prices_dict: Dict[str, Deque[float]] = {}
+        # TODO: keep track of only latest price instead of whole list
+
+        self.log_returns_dict: Dict[str, Deque[float]] = {}
+
+        self.bollinger_bands: Dict[tuple[str, str], BollingerBand] = {}
+
+        # The objects below are unique to each coin pair
+        # TODO: use frozensets as key instead of tuple (useful for more than 2 pairs, since order shouldn't matter)
+        self.betas_dict: Dict[tuple[str, str], Deque[float]] = {}
+        self.spreads_dict: Dict[tuple[str, str], Deque[float]] = {}
 
     def update(self):
         """
@@ -47,10 +51,9 @@ class MarketState:
         Other functions in this class will rely on the internal states that this function updates,
         so this function should be called before any other functions in each time instance.
         """
-        self.__update_time()
-        self.__fetch_prices()
-        self.__update_all_windows()
-        self.__update_bollinger_bands()
+        self.__update_time() # can use this to check for time drift or keep a timer
+        self.__fetch_prices() # updates the prices, log returns of tracked coins
+        self.__update_all_windows() # updates betas, spreads, and Bollinger bands of coin pairs
 
     def __update_time(self):
         # update internal clock to current time in milliseconds since epoch
@@ -59,11 +62,30 @@ class MarketState:
     def __fetch_prices(self):
         """Private function that updates the prices within the MarketState class"""
         for t in self.client.get_all_tickers():
+            # Update the price of all coins
+            # TODO: remove unnecessary coins if not used
             symbol, price = t["symbol"], float(t["price"])
             self.ticker_prices[symbol] = price
 
-    def __calculate_spread(self, price1: float, price2: float, beta: float) -> float:
-        return price1 - price2 * beta
+            # Add prices and log returns of tracked coins
+            if symbol in self.prices_dict:
+                self.prices_dict[symbol].append(price)
+                self.log_returns_dict[symbol].append(math.log(price) - self.log_returns_dict[symbol][-1])
+
+                # shrink window if window length is over limit
+                if len(self.prices_dict[symbol]) > self.window_size:
+                    # TODO: allow different window size for each coin; how do we handle multiple pairs with different window sizes?
+                    self.prices_dict[symbol].popleft()
+                    self.log_returns_dict[symbol].popleft()
+
+    def __calculate_spread(self, coin_pair: tuple[str, str]) -> float:
+        return self.prices_dict[coin_pair[0]] - self.prices_dict[coin_pair[1]] * self.betas_dict[coin_pair]
+
+    def __calculate_bollinger_band(self, coin_pair: tuple[str, str]):
+        window_mean = statistics.fmean(self.log_returns_dict[coin_pair])
+        window_stdev = statistics.stdev(self.log_returns_dict[coin_pair],
+                                        window_mean)  # standard deviation
+        self.bollinger_bands[coin_pair] = BollingerBand(mean=window_mean, stdev=window_stdev)
 
     def __calculate_kline_price_avg(self, k: Kline):
         return (float(k.low) + float(k.high)) / 2
@@ -82,10 +104,7 @@ class MarketState:
             kline = Kline(*k)
             yield function(kline)
 
-    def __calculate_beta(self, p1: float, p2: float):
-        return p1 / p2
-
-    def __fill_window(self, coin_pair: PairPortfolio, window_size: int):
+    def __fill_window(self, coin_pair: tuple[str, str], window_size: int):
         """
         Fill the window with historical data
 
@@ -97,61 +116,67 @@ class MarketState:
         - half the number of klines for each doubling of the time interval size
         """
 
-        # derive a formula for when we need to use historical fill
+        # TODO: derive a formula for when we need to use historical fill
+        # TODO: use window_size to determine how much data to get (or pop after certain counts)
 
-        # TODO: create function to calculate exact UTC startTime to get the desired window_size?
-        # XXX: should we attach the price's time to the window?
-        self.portfolios[coin_pair] = deque([])
-        count = 0  # TODO: optimize this
-        for price1, price2 in zip(self.__kline_generator(coin_pair.coin1, self.kline_interval),
-                                  self.__kline_generator(coin_pair.coin2, self.kline_interval)):
-            self.portfolios[coin_pair].append(price1 - price2 * coin_pair.beta)
-            if count > window_size:
-                self.portfolios[coin_pair].popleft()
+        # TODO: optimize; we can use the `timeit` module to measure the running time
 
-        assert (len(self.portfolios[coin_pair]) > 0)
+        # TODO: figure out what to do if two pairs have the same coin (use existing data?)
 
-    def __calculate_initial_band(self, coin_pair: PairPortfolio):
-        # TODO: optimize and handle potential overflow (checkout Numpy?), watchout for precision
-        window_mean = statistics.fmean(self.portfolios[coin_pair])
-        window_stdev = statistics.stdev(self.portfolios[coin_pair],
-                                        window_mean)  # sample standard deviation
-        self.bollinger_bands = BollingerBand(mean=window_mean, stdev=window_stdev)
+        # Calculations for each individual coin in the portfolio
+        prices_1 = self.__kline_generator(coin_pair[0], self.kline_interval)
+        prices_2 = self.__kline_generator(coin_pair[1], self.kline_interval)
+
+        log_returns_1 = np.diff(np.log(np.array(prices_1)))
+        log_returns_2 = np.diff(np.log(np.array(prices_2)))
+
+        # -- Portfolio specific calculations --
+
+        # Calculate betas
+        S1 = log_returns_1.copy()
+        S1 = sm.add_constant(S1)
+        results = sm.OLS(log_returns_2, S1).fit()
+        beta = results.params[1]
+
+        self.prices_dict[coin_pair[0]] = deque(prices_1)
+        self.prices_dict[coin_pair[1]] = deque(prices_2)
+
+        self.log_returns_dict[coin_pair[0]] = deque(log_returns_1)
+        self.log_returns_dict[coin_pair[1]] = deque(log_returns_2)
+
+        self.betas_dict[coin_pair] = deque([beta])
+
+        # Calculate spread of portfolio and initial Bollinger Band
+        self.__calculate_spread(coin_pair)
+        self.__calculate_bollinger_band(coin_pair)
+
+
 
     def __update_all_windows(self):
-        """Update the window with the current period"""
-        # TODO: combine with Jimmy's OLS
-        # TODO: clarify whether to update by calling Binance and getting a new window orr just update using latest price (potential synchronization issue)
-        for p in self.portfolios:
-            self.portfolios[p].popleft()
-            self.portfolios[p].append(self.current_spread(p.coin1, p.coin2, p.beta))
-
-    def __update_bollinger_bands(self):
-        pass
-
-    def track_spread_portfolio(self, coin1_symbol: str, coin2_symbol: str) -> bool:
-        """Compute beta internally, tracking a spread portfolio for a pair of coins. Returns true if successful, false otherwise.
-        Formula: spread = coin1 - coin2 * beta
-
-        Example:
-            Suppose that beta = 7.4
-            Then let's say you want to buy this spread, and you want to do 10 shares of coin1
-            Then you buy 10 shares of coin1, and you short 74 shares of coin2
-
-        XXX: potential issue with fractional shares due to the exchange's price/qty filters (need to verify)
+        # """Update the window with the current period"""
+        """This should be run after new prices are fetched for each coin.
+        We will redo the regression for each pair, and then append the new beta for each pair.
         """
-        # TODO: change params to coin1, coin2, beta
-        if coin_pair not in self.portfolios:
-            self.__fill_window(coin_pair, self.window_size)  # use default window_size for now
-            self.__calculate_initial_band(coin_pair)
-            self.pairs.add((coin_pair.coin1, coin_pair.coin2))
-            return True
-        else:
-            # if coin_pair already exists? just refill the window? return true orr false?
-            # allow updating window size?
-            return False
+        # TODO: clarify whether to update by calling Binance and getting a new window orr just update using latest price (potential synchronization issue)
+        coin_pair: tuple[str, str]
+        for coin_pair in self.betas_dict:
+            # calculate betas
+            S1 = self.log_returns_dict[coin_pair[0]].copy()
+            S1 = sm.add_constant(S1)
+            results = sm.OLS(self.log_returns_dict[coin_pair[1]], S1).fit()
+            new_beta = results.params[1]
+            self.betas_dict[coin_pair].append(new_beta)
 
-    def track_spread_portfolio(self, coin_pair: PairPortfolio) -> bool:
+            # TODO: use sliding window?, can probably make this constant time
+            # calculate spread for the portfolio
+            self.spreads_dict[coin_pair].append(self.__calculate_spread(coin_pair))
+
+            self.__calculate_bollinger_band(coin_pair) # update Bollinger Band
+
+
+
+
+    def track_spread_portfolio(self, coin_pair: tuple[str, str]) -> bool:
         """Begin tracking a spread portfolio for a pair of coins. Returns true if successful, false otherwise.
 
         Formula: spread = coin1 - coin2 * beta
@@ -163,31 +188,33 @@ class MarketState:
 
         XXX: potential issue with fractional shares due to the exchange's price/qty filters (need to verify)
         """
-        # TODO: change params to coin1, coin2, beta
-        if coin_pair not in self.portfolios:
+        if coin_pair not in self.prices_dict:
             self.__fill_window(coin_pair, self.window_size)  # use default window_size for now
-            self.__calculate_initial_band(coin_pair)
-            self.pairs.add((coin_pair.coin1, coin_pair.coin2))
             return True
         else:
             # if coin_pair already exists? just refill the window? return true orr false?
             # allow updating window size?
             return False
 
-    def untrack_spread_portfolio(self, coin_pair: PairPortfolio):
+    def untrack_spread_portfolio(self, coin_pair: tuple[str, str]):
         """Stop tracking a spread portfolio for a pair of coins. Returns true if successful, false otherwise."""
-        # TODO: change params to coin1, coin2
-        if coin_pair in self.portfolios:
-            del self.portfolios[coin_pair]
+        if coin_pair in self.prices_dict:
+            # TODO: check if other pairs have this coin since prices_dict and log_returns dict have only one coin as key
+            # del self.prices_dict[coin_pair[0]]
+            # del self.prices_dict[coin_pair[1]]
+            # del self.log_returns_dict[coin_pair[0]]
+            # del self.log_returns_dict[coin_pair[1]]
+
+            # the variables below are specific to each pair
+            del self.betas_dict[coin_pair]
+            del self.bollinger_bands[coin_pair]
+            del self.spreads_dict[coin_pair]
             return True
         else:
             return False
 
-    def update_beta(self, coin1: str, coin2: str, beta: float):
-        pass
-
-    def get_all_portfolios(self) -> list[PairPortfolio]:
-        return list(self.portfolios.keys())
+    def get_all_portfolios(self) -> list[tuple[str, str]]:
+        return list(self.spreads_dict.keys())
 
     def current_price(self, coin: str) -> float:
         """Get the current price of a specific coin"""
@@ -228,27 +255,36 @@ class MarketState:
         # TODO: change to John's new stop loss formula?
         return 0.005 * self.portfolio_balance()
 
-    def derivative_of_spread(self) -> float:
+    def derivative_of_spread(self, coin_pair: tuple[str, str]) -> float:
         # return the derivative of the spread price (slope of the spread)
+        # dS/dt = (spread_{t} - spread_{t-1}) / (t - (t-1)) = (spread_{t} - spread_{t-1})
+        # Assuming we use the spread at the current(latest) time and compare it to the spread of the last time we calculated it
+        # XXX: might need to change this to make it based on timestamp or if we skip some periods???
         # TODO: clarify formula: (change in price of spread) / (time or ??)
         # TODO: internal timer, 1 second for now, but make it adjustable
-        pass
+        assert(coin_pair in self.spreads_dict and len(self.spreads_dict[coin_pair]) > 0)
 
-    def current_spread(self, coin1: str, coin2: str) -> float:
-        # TODO: use internal beta and remove beta as param
-        return self.__calculate_spread(self.current_price(coin1), self.current_price(coin2), beta)
+        return (self.spreads_dict[coin_pair][-1] - self.spreads_dict[coin_pair][-2]) / (1 - 0) # in case we change it
 
-    def spread_moving_avg(self, coin1, coin2) -> float:
+    def current_spread(self, coin_pair: tuple[str, str]) -> float:
+        assert(coin_pair in self.spreads_dict and len(self.spreads_dict[coin_pair]) > 0)
+        return self.spreads_dict[coin_pair][-1]
+
+    def spread_moving_avg(self, coin_pair: tuple[str, str]) -> float:
         # middle Bollinger Band
-        # TODO: make more efficient by using sliding window technique (ensure no prrecision issue)
-        return self.bollinger_bands[(coin1, coin2)].mean
+        # TODO: make more efficient by using sliding window technique (ensure no precision issue)
+        # TODO: handle case when pair does not exist, should we raise error?
+        return self.bollinger_bands[coin_pair].mean
 
-    def spread_upper_bollinger_band(self, coin1, coin2) -> float:
-        return self.bollinger_bands[(coin1, coin2)].mean + 2 * self.bollinger_bands[(coin1, coin2)].stdev
+    def spread_upper_bollinger_band(self, coin_pair: tuple[str, str]) -> float:
+        return self.bollinger_bands[coin_pair].mean + 2 * self.bollinger_bands[coin_pair].stdev
 
-    def spread_lower_bollinger_band(self, coin1, coin2) -> float:
-        return self.bollinger_bands[(coin1, coin2)].mean - 2 * self.bollinger_bands[(coin1, coin2)].stdev
+    def spread_lower_bollinger_band(self, coin_pair: tuple[str, str]) -> float:
+        return self.bollinger_bands[coin_pair].mean - 2 * self.bollinger_bands[coin_pair].stdev
 
 # TODO: expand window of data after we have a position within a portfolio
-
 # TODO: define and handle which coin is coin1 or coin2 (order  matters?)
+# TODO: optimize and handle potential overflow (checkout Numpy?), watchout for precision
+# TODO: import system time and figure out how to keep track of time based on different input time units
+# TODO: handle/prevent rate limits
+# TODO: ensure coin pair tuple is always sorted lexicographically
