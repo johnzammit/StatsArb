@@ -1,6 +1,5 @@
 from typing import Dict, List
 from dataclasses import dataclass
-
 # NOTE: we create dataclasses with class variable names that match the JSON objects that Binance API returns
 # TODO: convert float to some a higher precision type since crypto uses a lot of decimal points
 # class Listing:
@@ -200,21 +199,9 @@ class OrderbookTicker:
     askPrice: str
     askQty: str
 
-
-@dataclass(frozen=True)
-class PairPortfolio:
-    """
-    Mean-reverting portfolio consisting of a pair of coins
-    The spread is defined as: spread = coin1 - coin2 * beta.
-    Beta should be a constant that makes spread's mean = 0.
-    Try to use the higher-priced coin as coin1, so that beta > 1
-    """
-    coin1: str  # coin1 (assume qty = 1)
-    coin2: str  # coin2 (assume qty = -beta)
-    beta: float  # constant that balances of the total value of coin1 and coin2
-
 @dataclass
 class BollingerBand:
+    # for internal use
     mean: float
     stdev: float
 
@@ -223,3 +210,5 @@ class PriceInterval:
     estimate: float
     lower: float
     upper: float
+
+CoinPortfolio = frozenset[str] # unordered set that allows arbitary number of coins in the portfolio
