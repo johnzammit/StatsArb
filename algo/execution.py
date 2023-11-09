@@ -11,6 +11,7 @@ from datamodel import Ticker, BollingerBand, PriceInterval
 
 import math
 from market_state import MarketState
+import asyncio
 
     
 """
@@ -119,7 +120,7 @@ class Execution():
             "timestamp": int(round(time.time() * 1000))
         }
         result = self.binanceus_request(uri_path, data, self.api_key, self.secret_key)
-        response_data = result.json()
+        response_data = result.json() # TODO: fix this
         # Check if there are open orders
         if len(response_data) > 0:
             return True
@@ -144,14 +145,14 @@ class Execution():
 
 
     #calculate time weighted take profit price for long position
-    async def take_profit_long_price(self, coin: float, timestamp) -> float:
+    async def take_profit_long_price(self, coin: float, timestamp: int) -> float:
         decrease_rate = 0.055
         target_price = MarketState.spread_moving_avg() - (decrease_rate * timestamp) + MarketState.derivative_of_spread() % MarketState.current_price(coin) / 100
         ## Need to add accelerator with the derivative of spread
 
         return target_price
     #calculate time weighted take profit price for short position
-    async def take_profit_short_price(self, coin: float, timestamp) -> float:
+    async def take_profit_short_price(self, coin: float, timestamp: int) -> float:
         decrease_rate = 0.055
         target_price = MarketState.spread_moving_avg() + (decrease_rate * timestamp) + MarketState.derivative_of_spread() % MarketState.current_price(coin) / 100
         ## Need to add accelerator with the derivative of spread
@@ -160,18 +161,20 @@ class Execution():
     
 
 
-    def main(self, spread: PriceInterval, long_coin: Ticker, short_coin: Ticker, quantity: float, stopPrice: float):
+    def main(self, spread: float, spread_bb: PriceInterval, long_coin: tuple[str, float], short_coin: tuple[str, float], quantity: float, stopPrice: float):
         # XXX: define quantity/fix params
         # TODO: making the function take in parameters allow us to test more easily and separately from MarketState (so we can isolate which class has a problem)
+        # maybe make the strategy define all of the parameters it needs
+        # TODO: create action object
         # XXX: should return a result for each iteration of this (so we can debug/see what happened in each iteration during backtest)
 
         #Define all variables using MarketState
 
         # check if we should buy or sell
-        if (self.place_order_condition(spread.estimate, spread.upper, spread.lower)):
+        if (self.place_order_condition(spread, spread_bb.upper, spread_bb.lower)):
             # TODO: ensure price and quantity are correct (is it same or separate)?
-            self.place_limit_buy(long_coin.symbol, long_coin.price, quantity, stopPrice)
-            self.place_limit_sell(short_coin.symbol, short_coin.price, quantity, stopPrice)
+            self.place_limit_buy(long_coin[0], long_coin[1], quantity, stopPrice)
+            self.place_limit_sell(short_coin[0], short_coin[1], quantity, stopPrice)
             original_position_value = self.open_positions_value()
 
             #start timer
@@ -185,18 +188,18 @@ class Execution():
                 #check if price is at or below hard stop loss
                 if (MarketState.hard_stop_loss() * -1 >= self.open_positions_value() - original_position_value):
                     #sell at hard stop loss
-                    self.place_limit_buy(long_coin.symbol, long_coin.price, quantity, stopPrice)
-                    self.place_limit_sell(short_coin.symbol, short_coin.price, quantity, stopPrice)
+                    self.place_limit_buy(long_coin[0], long_coin[1], quantity, stopPrice)
+                    self.place_limit_sell(short_coin[0], short_coin[1], quantity, stopPrice)
 
                 #update take profit price
-                long_take_profit= self.take_profit_long_price(long_coin, timestamp)
-                short_take_profit = self.take_profit_short_price(short_coin, timestamp)
+                long_take_profit= self.take_profit_long_price(long_coin[1], timestamp)
+                short_take_profit = self.take_profit_short_price(short_coin[1], timestamp)
 
                 #consider adding a time delay here
 
                 #update limit sell order at take profit price
-                self.update_limit_sell(long_coin, take_profit_price)
-                self.update_limit_sell(short_coin, take_profit_price)
+                self.update_limit_sell(long_coin[0], long_take_profit)
+                self.update_limit_sell(short_coin[0], short_take_profit)
 
                 #check if orders are still open
                 if self.check_open_orders():

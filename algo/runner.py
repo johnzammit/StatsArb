@@ -47,10 +47,8 @@ def main():
                 elif p == ...:
                     pairs_to_trade.remove(p)
                     state.untrack_spread_portfolio(p)
-                elif p == ...:
-                    state.update_beta(p)
 
-        state.update()
+        state.update() # might need to put his before list of pairs to update (for MarketState calculation purposes)
 
         for p in pairs_to_trade:
             portfolio_info = (state.current_price(), ..., ...)
