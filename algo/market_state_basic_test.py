@@ -6,6 +6,7 @@ from typing import Callable, Any, Deque
 from binance import Client
 
 from datamodel import *
+from datamodel import BollingerBand
 
 import statsmodels.api as sm
 import pandas as pd
@@ -89,8 +90,8 @@ class MarketState:
     def __fetch_prices(self):
         for pair in self.pairs:
             for coin in pair:
-                next_price = self.coin_dfs[coin][self.row]
-
+                next_price = self.coin_dfs[coin].iloc[self.row]['close']
+                
                 self.prices_dict[coin].append(next_price)
                 self.log_returns_dict[coin].append(math.log(next_price) - self.log_returns_dict[coin][-1])
 
@@ -103,9 +104,21 @@ class MarketState:
     def __calculate_spread(self, coin_pair: tuple[str, str]) -> float:
         return self.log_returns_dict[coin_pair[0]][-1] - self.log_returns_dict[coin_pair[1]][-1] * self.betas_dict[coin_pair][-1]
 
+    def __calculate_spread_list(self, coin_pair: tuple[str, str]) -> float:
+        # print("log returns list" + str(self.log_returns_dict[coin_pair[0]]))
+        # print("log returns list" + str(self.log_returns_dict[coin_pair[1]]))
+
+        product_list = [(self.betas_dict[coin_pair])[0] * x for x in self.log_returns_dict[coin_pair[1]]]
+        element_wise_sub_list = [a - b for a, b in zip(self.log_returns_dict[coin_pair[0]], product_list)]
+        return deque(element_wise_sub_list)
+
     def __calculate_bollinger_band(self, coin_pair: tuple[str, str]):
-        window_mean = statistics.fmean(self.log_returns_dict[coin_pair])
-        window_stdev = statistics.stdev(self.log_returns_dict[coin_pair],
+        # print("spread list")
+        # # print(self.spreads_dict[coin_pair])
+        # print("---------------------------")
+
+        window_mean = statistics.fmean(self.spreads_dict[coin_pair])
+        window_stdev = statistics.stdev(self.spreads_dict[coin_pair],
                                         window_mean)  # standard deviation
         self.bollinger_bands[coin_pair] = BollingerBand(mean=window_mean, stdev=window_stdev)
 
@@ -159,8 +172,12 @@ class MarketState:
         self.pairs.add(coin_pair)
 
         # Get 1-year historical dfs
-        self.coin_dfs[coin_pair[0]] = self.get_data(coin_pair[0], self.kline_interval, "1 Oct, 2022", "1 Oct, 2023")
-        self.coin_dfs[coin_pair[1]] = self.get_data(coin_pair[1], self.kline_interval, "1 Oct, 2022", "1 Oct, 2023")
+        self.coin_dfs[coin_pair[0]] = self.get_data(coin_pair[0], self.kline_interval, "1 Oct, 2022", "2 Oct, 2022")
+
+        print("Dataframe: ")
+        print(self.coin_dfs[coin_pair[0]])
+
+        self.coin_dfs[coin_pair[1]] = self.get_data(coin_pair[1], self.kline_interval, "1 Oct, 2022", "2 Oct, 2022")
 
         # Calculations for each individual coin in the portfolio
         # prices_1 = self.__kline_generator(coin_pair[0], self.kline_interval)
@@ -169,6 +186,8 @@ class MarketState:
         prices_1 = list((self.coin_dfs[coin_pair[0]])[:30]['close'])
         prices_2 = list((self.coin_dfs[coin_pair[1]])[:30]['close'])
 
+        # print("Length of prices_1 is: ", str(len(prices_1)))
+        # print("Length of prices_2 is: ", str(len(prices_2)))
         log_returns_1 = np.diff(np.log(np.array(prices_1)))
         log_returns_2 = np.diff(np.log(np.array(prices_2)))
 
@@ -176,8 +195,10 @@ class MarketState:
 
         # Calculate betas
         S1 = log_returns_1.copy()
+        # print("Length of log returns is: ", str(len(log_returns_1)))
         S1 = sm.add_constant(S1)
         results = sm.OLS(log_returns_2, S1).fit()
+        # print(str(results.params[0]) + str(results.params[1]))
         beta = results.params[1]
 
         self.prices_dict[coin_pair[0]] = deque(prices_1)
@@ -189,7 +210,8 @@ class MarketState:
         self.betas_dict[coin_pair] = deque([beta])
 
         # Calculate spread of portfolio and initial Bollinger Band
-        self.__calculate_spread(coin_pair)
+        # self.__calculate_spread(coin_pair)
+        self.spreads_dict[coin_pair]= (self.__calculate_spread_list(coin_pair))
         self.__calculate_bollinger_band(coin_pair)
 
 
@@ -203,16 +225,17 @@ class MarketState:
         coin_pair: tuple[str, str]
         for coin_pair in self.betas_dict:
             # calculate betas
-            S1 = self.log_returns_dict[coin_pair[0]].copy()
+            S1 = list(self.log_returns_dict[coin_pair[0]].copy())
             S1 = sm.add_constant(S1)
-            results = sm.OLS(self.log_returns_dict[coin_pair[1]], S1).fit()
+            S2 = list(self.log_returns_dict[coin_pair[1]].copy())
+            results = sm.OLS(S2, S1).fit()
             new_beta = results.params[1]
             self.betas_dict[coin_pair].append(new_beta)
 
             # TODO: use sliding window?, can probably make this constant time
             # calculate spread for the portfolio
             self.spreads_dict[coin_pair].append(self.__calculate_spread(coin_pair))
-
+    
             self.__calculate_bollinger_band(coin_pair) # update Bollinger Band
 
 
@@ -261,7 +284,8 @@ class MarketState:
     def current_price(self, coin: str) -> float:
         """Get the current price of a specific coin"""
         # return self.ticker_prices[coin]
-        return self.coin_dfs[coin][self.row]
+        curr_price = self.coin_dfs[coin].iloc[self.row]['close']
+        return curr_price
 
     def portfolio_balance(self) -> float:
         """Total USD value of all coins in exchange that we are holding"""
