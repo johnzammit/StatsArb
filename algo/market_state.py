@@ -40,6 +40,8 @@ class MarketState:
         self.portfolios = dict()  # key: (coin1, coin2), value: object with beta, prices, bollinger bands
         self.bollinger_bands = dict() # key: (coin1, coin2)
 
+    #beta values??
+    
     def update(self):
         """
         Updates the MarketState by fetching the latest data from the exchange.
@@ -252,3 +254,12 @@ class MarketState:
 # TODO: expand window of data after we have a position within a portfolio
 
 # TODO: define and handle which coin is coin1 or coin2 (order  matters?)
+
+
+
+
+
+
+
+
+
