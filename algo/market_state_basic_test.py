@@ -28,7 +28,7 @@ class MarketState:
         self.client = client
 
         self.ticker_prices = {}  # key: symbol (str), value: latest price (float)
-
+        
         # Binance uses milliseconds for the 'time' in the response
         self.kline_interval = kline_interval  # smallest kline time interval is 1 minute
         self.__update_time()
@@ -50,6 +50,8 @@ class MarketState:
         # TODO: use frozensets as key instead of tuple (useful for more than 2 pairs, since order shouldn't matter)
         self.betas_dict: Dict[tuple[str, str], Deque[float]] = {}
         self.spreads_dict: Dict[tuple[str, str], Deque[float]] = {}
+        self.all_spreads_data: Dict[tuple[str, str], Deque[float]] = {} # for graphing
+        self.all_bollinger_bands: Dict[tuple[str, str], list(tuple[float, float])] = {} # for graphing
 
     def update(self):
         """
@@ -121,7 +123,10 @@ class MarketState:
         window_stdev = statistics.stdev(self.spreads_dict[coin_pair],
                                         window_mean)  # standard deviation
         self.bollinger_bands[coin_pair] = BollingerBand(mean=window_mean, stdev=window_stdev)
-
+        if coin_pair not in self.all_bollinger_bands:
+            self.all_bollinger_bands[coin_pair] = []
+        self.all_bollinger_bands[coin_pair].append(((BollingerBand(mean=window_mean, stdev=window_stdev).mean, BollingerBand(mean=window_mean, stdev=window_stdev).stdev)))
+    
     def __calculate_kline_price_avg(self, k: Kline):
         return (float(k.low) + float(k.high)) / 2
 
@@ -172,12 +177,12 @@ class MarketState:
         self.pairs.add(coin_pair)
 
         # Get 1-year historical dfs
-        self.coin_dfs[coin_pair[0]] = self.get_data(coin_pair[0], self.kline_interval, "1 Oct, 2022", "2 Oct, 2022")
+        self.coin_dfs[coin_pair[0]] = self.get_data(coin_pair[0], self.kline_interval, "1 Oct, 2022", "30 Oct, 2022")
 
         print("Dataframe: ")
         print(self.coin_dfs[coin_pair[0]])
 
-        self.coin_dfs[coin_pair[1]] = self.get_data(coin_pair[1], self.kline_interval, "1 Oct, 2022", "2 Oct, 2022")
+        self.coin_dfs[coin_pair[1]] = self.get_data(coin_pair[1], self.kline_interval, "1 Oct, 2022", "30 Oct, 2022")
 
         # Calculations for each individual coin in the portfolio
         # prices_1 = self.__kline_generator(coin_pair[0], self.kline_interval)
@@ -212,6 +217,7 @@ class MarketState:
         # Calculate spread of portfolio and initial Bollinger Band
         # self.__calculate_spread(coin_pair)
         self.spreads_dict[coin_pair]= (self.__calculate_spread_list(coin_pair))
+        self.all_spreads_data[coin_pair] = (self.__calculate_spread_list(coin_pair))
         self.__calculate_bollinger_band(coin_pair)
 
 
@@ -235,10 +241,15 @@ class MarketState:
             # TODO: use sliding window?, can probably make this constant time
             # calculate spread for the portfolio
             self.spreads_dict[coin_pair].append(self.__calculate_spread(coin_pair))
-    
+            self.all_spreads_data[coin_pair].append(self.__calculate_spread(coin_pair))
             self.__calculate_bollinger_band(coin_pair) # update Bollinger Band
 
 
+    def plot_spread(self) -> dict:
+        return self.all_spreads_data
+    
+    def plot_bollinger_bands(self) -> dict:
+        return self.all_bollinger_bands
 
 
     def track_spread_portfolio(self, coin_pair: tuple[str, str]) -> bool:

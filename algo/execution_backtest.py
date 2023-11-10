@@ -115,8 +115,11 @@ class Execution():
         ## Need to add accelerator with the derivative of spread
         return target_price
     
-
-
+    def plot_spread(self):
+        return self.mstate.plot_spread()
+    def plot_boll_bands(self):
+        return self.mstate.plot_bollinger_bands()
+    
     def main(self, long_coin: str, short_coin: str):
         # XXX: define quantity/fix params
         # TODO: making the function take in parameters allow us to test more easily and separately from MarketState (so we can isolate which class has a problem)
@@ -162,3 +165,33 @@ from exchange_setup import establish_connection
 client = establish_connection(True)
 execute = Execution(client)
 execute.main("FORTHUSD", "ZENUSD" )
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+spread = execute.plot_spread()
+bband = execute.plot_boll_bands()
+
+mean_values, stdev_values = zip(*bband[('FORTHUSD', 'ZENUSD')])
+
+upper_bound = [mean + 2 * stdev for mean, stdev in zip(mean_values, stdev_values)]
+lower_bound = [mean - 2 * stdev for mean, stdev in zip(mean_values, stdev_values)]
+
+# Plotting
+plt.figure(figsize=(10, 6))
+
+# Plot mean values
+plt.plot(mean_values, label='Mean', marker='.')
+
+# Plot mean +- 2 * stdev
+plt.plot(upper_bound, label='Upper Bollinger', marker='.')
+plt.plot(lower_bound, label='Lower Bollinger', marker='.')
+
+# Add labels and title
+plt.xlabel('Data Point Index')
+plt.ylabel('Values')
+plt.title('Mean and Bollinger Bands for (FORTHUSD, ZENUSD)')
+plt.legend()
+
+# Show the plot
+plt.show()
