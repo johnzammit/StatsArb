@@ -32,7 +32,7 @@ Execution:
 
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from market_state_basic_test import MarketState
-from execution import Execution
+from execution_backtest import Execution
 from exchange_setup import establish_connection
 
 def main():
@@ -47,8 +47,8 @@ def main():
     for p in pairs_to_trade:
         state.track_spread_portfolio(p)
 
-    executor = Execution(...)
-
+    executor = Execution(client)
+    
     while True:
         # Listen for updates to coin list to trade
         updates_to_coin_pairs = ... # check for updates from user or cointegration tester

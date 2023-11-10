@@ -174,6 +174,11 @@ class MarketState:
             self.__calculate_bollinger_band(coin_pair) # update Bollinger Band
 
 
+    def open_order(self):
+    # TODO: make a new window once order is open
+        pass
+
+
 
 
     def track_spread_portfolio(self, coin_pair: tuple[str, str]) -> bool:

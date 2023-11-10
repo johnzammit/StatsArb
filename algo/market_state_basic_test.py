@@ -38,7 +38,7 @@ class MarketState:
         # TODO: handle window_size > 1000 (current window size limit per request on Binance API is 1000)
         self.window_size = window_size  # TODO: allow different window_size and time unit for different pairs?
 
-        self.prices_dict: Dict[str, Deque[float]] = {}
+        self.prices_dict: Dict[str, Deque[float]] = {} # Might not really need this, we really just need log returns
         # TODO: keep track of only latest price instead of whole list
 
         self.log_returns_dict: Dict[str, Deque[float]] = {}
@@ -101,7 +101,7 @@ class MarketState:
                     self.log_returns_dict[coin].popleft()
 
     def __calculate_spread(self, coin_pair: tuple[str, str]) -> float:
-        return self.prices_dict[coin_pair[0]] - self.prices_dict[coin_pair[1]] * self.betas_dict[coin_pair]
+        return self.log_returns_dict[coin_pair[0]][-1] - self.log_returns_dict[coin_pair[1]][-1] * self.betas_dict[coin_pair][-1]
 
     def __calculate_bollinger_band(self, coin_pair: tuple[str, str]):
         window_mean = statistics.fmean(self.log_returns_dict[coin_pair])
@@ -260,7 +260,8 @@ class MarketState:
 
     def current_price(self, coin: str) -> float:
         """Get the current price of a specific coin"""
-        return self.ticker_prices[coin]
+        # return self.ticker_prices[coin]
+        return self.coin_dfs[coin][self.row]
 
     def portfolio_balance(self) -> float:
         """Total USD value of all coins in exchange that we are holding"""
@@ -324,6 +325,8 @@ class MarketState:
     def spread_lower_bollinger_band(self, coin_pair: tuple[str, str]) -> float:
         return self.bollinger_bands[coin_pair].mean - 2 * self.bollinger_bands[coin_pair].stdev
 
+    def beta(self, coin_pair: tuple[str, str]) -> list[float]:
+        return list(self.betas_dict[coin_pair])
 # TODO: expand window of data after we have a position within a portfolio
 # TODO: define and handle which coin is coin1 or coin2 (order  matters?)
 # TODO: optimize and handle potential overflow (checkout Numpy?), watchout for precision
