@@ -46,6 +46,13 @@ class MarketState:
 
     def update(self):
         """
+        # Internal timer that fetches prices every 1 minute
+        # explore lower timeframe sampling for backtest
+        # sample how long it takes to update (tick coming in -> buy/sell order) time it
+        # paper trade and compare to backtest
+        # isolate code profiling
+        # storing data , how you calculate, operations to calculate
+        # for ols regression, see if converting deque to np.array is faster
         Updates the MarketState by fetching the latest data from the exchange.
         This function should be called on every tick (as defined by the algorithm).
         Other functions in this class will rely on the internal states that this function updates,
