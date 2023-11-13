@@ -177,12 +177,12 @@ class MarketState:
         self.pairs.add(coin_pair)
 
         # Get 1-year historical dfs
-        self.coin_dfs[coin_pair[0]] = self.get_data(coin_pair[0], self.kline_interval, "1 Oct, 2022", "30 Oct, 2022")
+        self.coin_dfs[coin_pair[0]] = self.get_data(coin_pair[0], self.kline_interval, "1 Oct, 2022", "15 Oct, 2022")
 
         print("Dataframe: ")
         print(self.coin_dfs[coin_pair[0]])
 
-        self.coin_dfs[coin_pair[1]] = self.get_data(coin_pair[1], self.kline_interval, "1 Oct, 2022", "30 Oct, 2022")
+        self.coin_dfs[coin_pair[1]] = self.get_data(coin_pair[1], self.kline_interval, "1 Oct, 2022", "15 Oct, 2022")
 
         # Calculations for each individual coin in the portfolio
         # prices_1 = self.__kline_generator(coin_pair[0], self.kline_interval)

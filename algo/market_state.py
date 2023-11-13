@@ -53,6 +53,7 @@ class MarketState:
         # isolate code profiling
         # storing data , how you calculate, operations to calculate
         # for ols regression, see if converting deque to np.array is faster
+        
         Updates the MarketState by fetching the latest data from the exchange.
         This function should be called on every tick (as defined by the algorithm).
         Other functions in this class will rely on the internal states that this function updates,

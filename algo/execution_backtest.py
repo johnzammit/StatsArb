@@ -181,8 +181,9 @@ lower_bound = [mean - 2 * stdev for mean, stdev in zip(mean_values, stdev_values
 plt.figure(figsize=(10, 6))
 
 # Plot mean values
-plt.plot(mean_values, label='Mean', marker='.')
+#plt.plot(mean_values, label='Mean', marker='.')
 
+plt.plot(spread[('FORTHUSD', 'ZENUSD')], label='Spread', marker='.')
 # Plot mean +- 2 * stdev
 plt.plot(upper_bound, label='Upper Bollinger', marker='.')
 plt.plot(lower_bound, label='Lower Bollinger', marker='.')
