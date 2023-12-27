@@ -63,8 +63,8 @@ class Execution():
     def place_limit_buy(self, symbol: str, quantity: float): 
         self.balance -= quantity * self.mstate.current_price(symbol)
         self.initial_order_value += quantity *  self.mstate.current_price(symbol)
-        print("Order placed: " + symbol + " at " + str(self.mstate.current_price(symbol)))
-        print("Balance: " + str(self.balance))
+        # print("Order placed: " + symbol + " at " + str(self.mstate.current_price(symbol)))
+        # print("Balance: " + str(self.balance))
         self.open_orders +=1
     
 
@@ -72,20 +72,20 @@ class Execution():
     def place_limit_sell(self, symbol: str, quantity: float):
         self.balance += quantity *  self.mstate.current_price(symbol)
         self.initial_order_value += quantity *  self.mstate.current_price(symbol)
-        print("Order placed: " + symbol + " at " +  str(self.mstate.current_price(symbol)))
-        print("Balance: " + str(self.balance))
+        # print("Order placed: " + symbol + " at " +  str(self.mstate.current_price(symbol)))
+        # print("Balance: " + str(self.balance))
         self.open_orders +=1
         
     def close_limit_buy(self, symbol: str, quantity: float):
         self.balance += quantity *  self.mstate.current_price(symbol)
-        print("Order closed: " + symbol + " at " +  str(self.mstate.current_price(symbol)))
-        print("Balance: " + str(self.balance))
+        # print("Order closed: " + symbol + " at " +  str(self.mstate.current_price(symbol)))
+        # print("Balance: " + str(self.balance))
         self.open_orders -=1
     
     def close_limit_sell(self, symbol: str, quantity: float):
         self.balance -= quantity *  self.mstate.current_price(symbol)
-        print("Order closed: " + symbol + " at " +  str(self.mstate.current_price(symbol))) 
-        print("Balance: " + str(self.balance))
+        # print("Order closed: " + symbol + " at " +  str(self.mstate.current_price(symbol))) 
+        # print("Balance: " + str(self.balance))
         self.open_orders -=1
 
     #check if orders are still open or not before placing new orders
@@ -94,7 +94,7 @@ class Execution():
         
     def current_positions_value(self, long_coin, short_coin, quantity_long, quantity_short) -> float:
         total_position_value = self.mstate.current_price(long_coin) * quantity_long + self.mstate.current_price(short_coin) * quantity_short
-        print("Current position value: " + str(total_position_value))
+        #print("Current position value: " + str(total_position_value))
         return total_position_value
 
 
@@ -193,6 +193,9 @@ plt.xlabel('Data Point Index')
 plt.ylabel('Values')
 plt.title('Mean and Bollinger Bands for (FORTHUSD, ZENUSD)')
 plt.legend()
+
+# Change range of x-vals
+plt.xlim(2500, len(spread))
 
 # Show the plot
 plt.show()

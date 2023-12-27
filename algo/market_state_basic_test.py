@@ -95,7 +95,7 @@ class MarketState:
                 next_price = self.coin_dfs[coin].iloc[self.row]['close']
                 
                 self.prices_dict[coin].append(next_price)
-                self.log_returns_dict[coin].append(math.log(next_price) - self.log_returns_dict[coin][-1])
+                self.log_returns_dict[coin].append(math.log(next_price) - math.log(self.prices_dict[coin][-1]))
 
                 # shrink window if window length is over limit
                 if len(self.prices_dict[coin]) > self.window_size:
@@ -176,14 +176,17 @@ class MarketState:
         # Add pair to set
         self.pairs.add(coin_pair)
 
-        # Get 1-year historical dfs
+
+
+        #half a month
         self.coin_dfs[coin_pair[0]] = self.get_data(coin_pair[0], self.kline_interval, "1 Oct, 2022", "15 Oct, 2022")
 
         print("Dataframe: ")
         print(self.coin_dfs[coin_pair[0]])
 
         self.coin_dfs[coin_pair[1]] = self.get_data(coin_pair[1], self.kline_interval, "1 Oct, 2022", "15 Oct, 2022")
-
+        print("Dataframe2: ")
+        print(self.coin_dfs[coin_pair[1]])    
         # Calculations for each individual coin in the portfolio
         # prices_1 = self.__kline_generator(coin_pair[0], self.kline_interval)
         # prices_2 = self.__kline_generator(coin_pair[1], self.kline_interval)

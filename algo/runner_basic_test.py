@@ -31,8 +31,8 @@ Execution:
 
 
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
-from market_state_basic_test import MarketState
-from execution_backtest import Execution
+from algo.backtest.market_state_basic_test import MarketState
+from algo.backtest.execution_backtest import Execution
 from exchange_setup import establish_connection
 
 def main():

@@ -10,7 +10,7 @@ import datetime
 from datamodel import Ticker, BollingerBand, PriceInterval
 
 import math
-from market_state_basic_test import MarketState
+from algo.backtest.market_state_basic_test import MarketState
 import asyncio
 
     
